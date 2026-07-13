@@ -19,13 +19,24 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk \
-            python3-pip autoconf libtool \
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            git zip unzip \
+            autoconf libtool \
             pkg-config zlib1g-dev libncurses-dev \
             libtinfo5 cmake libffi-dev \
-            libssl-dev
+            libssl-dev python3-pip || {
+              echo "Some packages failed, trying alternative names..."
+              sudo apt-get install -y -qq \
+                git zip unzip \
+                autoconf libtool \
+                pkg-config zlib1g-dev libncurses-dev \
+                cmake libffi-dev libssl-dev python3-pip
+            }
+          # Install JDK - try multiple names
+          sudo apt-get install -y -qq openjdk-17-jdk 2>/dev/null || \
+          sudo apt-get install -y -qq openjdk-21-jdk 2>/dev/null || \
+          echo "WARNING: JDK installation failed, buildozer may not work"
 
       - name: Install Buildozer
         run: |
