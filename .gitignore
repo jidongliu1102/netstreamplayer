@@ -1,0 +1,6 @@
+*.pyc
+.buildozer/
+Dockerfile.build
+custom-entrypoint.sh
+preclone.sh
+.hermes-tmp.*
