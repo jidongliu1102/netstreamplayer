@@ -1,0 +1,326 @@
+#:kivy 2.0
+
+<SourceListScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.13, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        # Header
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [dp(10), dp(5)]
+            spacing: dp(5)
+
+            Label:
+                text: 'NetStreamPlayer'
+                font_size: dp(20)
+                bold: True
+                color: 0.9, 0.9, 0.9, 1
+                size_hint_x: 0.6
+                halign: 'left'
+                text_size: self.size
+
+            Button:
+                text: '+ Add Source'
+                size_hint_x: 0.4
+                background_color: 0.2, 0.6, 0.3, 1
+                background_normal: ''
+                on_release: root.add_new_source()
+
+        # Source list
+        ScrollView:
+            id: source_list_container
+            BoxLayout:
+                id: source_list
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(3)
+                padding: [dp(5), dp(5)]
+
+        # Footer info
+        BoxLayout:
+            size_hint_y: 0.05
+            padding: [dp(10), dp(2)]
+            Label:
+                text: 'Motion / MJPG-Streamer Player v1.0'
+                font_size: dp(10)
+                color: 0.5, 0.5, 0.5, 1
+
+
+<EditSourceScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.12, 0.12, 0.15, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        # Header
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [dp(10), dp(5)]
+            spacing: dp(5)
+            Button:
+                text: '← Back'
+                size_hint_x: 0.25
+                background_color: 0.3, 0.3, 0.3, 1
+                background_normal: ''
+                on_release: root.cancel()
+            Label:
+                text: 'Edit Source'
+                font_size: dp(18)
+                bold: True
+                color: 0.9, 0.9, 0.9, 1
+
+        # Form
+        ScrollView:
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(20), dp(15)]
+                spacing: dp(12)
+
+                Label:
+                    text: 'Source Name:'
+                    font_size: dp(14)
+                    color: 0.7, 0.7, 0.7, 1
+                    size_hint_y: None
+                    height: dp(20)
+                    halign: 'left'
+                    text_size: self.size
+
+                TextInput:
+                    id: source_name
+                    hint_text: 'e.g. Front Door Camera'
+                    size_hint_y: None
+                    height: dp(40)
+                    background_color: 0.2, 0.2, 0.25, 1
+                    foreground_color: 1, 1, 1, 1
+                    hint_text_color: 0.4, 0.4, 0.4, 1
+                    multiline: False
+
+                Label:
+                    text: 'Stream URL:'
+                    font_size: dp(14)
+                    color: 0.7, 0.7, 0.7, 1
+                    size_hint_y: None
+                    height: dp(20)
+                    halign: 'left'
+                    text_size: self.size
+
+                TextInput:
+                    id: source_url
+                    hint_text: 'http://192.168.1.100:8080/video.mjpg'
+                    size_hint_y: None
+                    height: dp(40)
+                    background_color: 0.2, 0.2, 0.25, 1
+                    foreground_color: 1, 1, 1, 1
+                    hint_text_color: 0.4, 0.4, 0.4, 1
+                    multiline: False
+
+                GridLayout:
+                    cols: 2
+                    spacing: dp(10)
+                    size_hint_y: None
+                    height: dp(80)
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(5)
+                        Label:
+                            text: 'Username:'
+                            font_size: dp(12)
+                            color: 0.6, 0.6, 0.6, 1
+                            size_hint_y: None
+                            height: dp(18)
+                            halign: 'left'
+                            text_size: self.size
+                        TextInput:
+                            id: source_username
+                            hint_text: '(optional)'
+                            size_hint_y: None
+                            height: dp(35)
+                            background_color: 0.2, 0.2, 0.25, 1
+                            foreground_color: 1, 1, 1, 1
+                            hint_text_color: 0.4, 0.4, 0.4, 1
+                            multiline: False
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(5)
+                        Label:
+                            text: 'Password:'
+                            font_size: dp(12)
+                            color: 0.6, 0.6, 0.6, 1
+                            size_hint_y: None
+                            height: dp(18)
+                            halign: 'left'
+                            text_size: self.size
+                        TextInput:
+                            id: source_password
+                            hint_text: '(optional)'
+                            size_hint_y: None
+                            height: dp(35)
+                            background_color: 0.2, 0.2, 0.25, 1
+                            foreground_color: 1, 1, 1, 1
+                            hint_text_color: 0.4, 0.4, 0.4, 1
+                            multiline: False
+                            password: True
+
+                # URL examples
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: dp(60)
+                    padding: [dp(5), dp(5)]
+                    Label:
+                        text: 'Common URL patterns:'
+                        font_size: dp(11)
+                        color: 0.5, 0.5, 0.5, 1
+                        size_hint_y: None
+                        height: dp(15)
+                    Label:
+                        text: 'Motion: http://IP:PORT/\nMJPG-Streamer: http://IP:PORT/?action=stream'
+                        font_size: dp(10)
+                        color: 0.4, 0.4, 0.5, 1
+                        size_hint_y: None
+                        height: dp(40)
+                        markup: True
+
+        # Buttons
+        BoxLayout:
+            size_hint_y: 0.1
+            padding: [dp(20), dp(10)]
+            spacing: dp(15)
+
+            Button:
+                text: 'Cancel'
+                background_color: 0.3, 0.3, 0.3, 1
+                background_normal: ''
+                on_release: root.cancel()
+
+            Button:
+                id: save_btn
+                text: 'Save Source'
+                background_color: 0.0, 0.5, 0.8, 1
+                background_normal: ''
+                on_release: root.save_source()
+
+
+<PlayerScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+
+        # Video display area (takes up most space)
+        RelativeLayout:
+            id: video_container
+            size_hint_y: 0.85
+
+            # Zoom container for the video
+            RelativeLayout:
+                id: zoom_container
+
+            # Stream status overlay
+            Label:
+                id: stream_info
+                text: 'Connecting...'
+                size_hint: None, None
+                size: self.texture_size[0] + dp(20), dp(30)
+                pos: dp(5), dp(5)
+                font_size: dp(11)
+                color: 0.8, 0.8, 0.8, 1
+                canvas.before:
+                    Color:
+                        rgba: 0, 0, 0, 0.5
+                    Rectangle:
+                        pos: self.pos
+                        size: self.size
+
+            # No connection overlay
+            Label:
+                text: 'No stream'
+                font_size: dp(16)
+                color: 0.5, 0.5, 0.5, 1
+                opacity: 0 if root.get_mjpeg_display().is_connected else 1
+
+        # Control bar
+        BoxLayout:
+            id: player_controls
+            size_hint_y: 0.15
+            padding: [dp(5), dp(5)]
+            spacing: dp(5)
+            canvas.before:
+                Color:
+                    rgba: 0.08, 0.08, 0.1, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            # Screenshot
+            Button:
+                id: screenshot_btn
+                text: '📷 Shot'
+                font_size: dp(11)
+                background_color: 0.2, 0.2, 0.5, 1
+                background_normal: ''
+                on_release: root.take_screenshot()
+
+            # Record
+            Button:
+                id: record_btn
+                text: '⏺ Rec'
+                font_size: dp(11)
+                background_color: 0.8, 0.2, 0.2, 0.7
+                background_normal: ''
+                on_release: root.toggle_recording()
+
+            # Fullscreen toggle
+            Button:
+                id: fullscreen_btn
+                text: '⛶ Full'
+                font_size: dp(11)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.toggle_fullscreen()
+
+            # Orientation
+            Button:
+                id: orientation_btn
+                text: '◉ Auto'
+                font_size: dp(11)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.toggle_orientation()
+
+            # Reset zoom
+            Button:
+                text: '⊞ Fit'
+                font_size: dp(11)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.reset_zoom()
+
+            # Settings
+            Button:
+                text: '⚙'
+                font_size: dp(14)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.show_settings()
+
+            # Back
+            Button:
+                text: '←'
+                font_size: dp(14)
+                background_color: 0.6, 0.2, 0.2, 1
+                background_normal: ''
+                on_release: root.go_back()
