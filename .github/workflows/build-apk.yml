@@ -45,6 +45,8 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
+          pwd
+          ls -la buildozer.spec
           yes | buildozer android debug 2>&1
 
       - name: Upload APK
