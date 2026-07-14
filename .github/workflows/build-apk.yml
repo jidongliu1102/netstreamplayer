@@ -47,14 +47,12 @@ jobs:
         run: |
           pwd
           ls -la buildozer.spec
-          # Pre-check: verify buildozer works
-          python3 -c "import buildozer; print('buildozer OK')" 2>&1 || echo "buildozer import failed"
+          python3 -c "import buildozer; print('buildozer OK')"
           which buildozer
-          buildozer --version 2>&1 || echo "buildozer version failed"
-          yes | buildozer android debug 2>&1 || true
-          echo "=== Build exit code: $? ==="
-          # Show any APK files that were created
-          find bin/ -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
+          buildozer --version
+          yes | buildozer android debug 2>&1
+          echo "=== Build complete ==="
+          find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
 
       - name: Upload APK
         uses: actions/upload-artifact@v7.0.1
