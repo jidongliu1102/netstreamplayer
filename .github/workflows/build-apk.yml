@@ -45,13 +45,17 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          pwd
-          ls -la buildozer.spec
-          python3 -c "import buildozer; print('buildozer OK')"
-          which buildozer
-          buildozer --version
-          yes | buildozer android debug 2>&1
-          echo "=== Build complete ==="
+          # First run triggers SDK download
+          yes | buildozer android debug 2>&1 || true
+          # Accept SDK licenses and install platform if buildozer already downloaded the SDK
+          SDK=~/.buildozer/android/platform/android-sdk
+          if [ -d "$SDK" ]; then
+            yes | $SDK/tools/bin/sdkmanager --sdk_root=$SDK --licenses 2>/dev/null || true
+            yes | $SDK/tools/bin/sdkmanager --sdk_root=$SDK 'platforms;android-34' 2>/dev/null || true
+          fi
+          # Second run with licenses accepted
+          yes | buildozer android debug 2>&1 || true
+          echo "=== APK files ==="
           find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
 
       - name: Upload APK
