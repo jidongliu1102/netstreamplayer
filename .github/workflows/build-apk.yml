@@ -45,26 +45,30 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          # First run: download SDK components
-          echo "=== First run: download SDK ==="
-          yes | buildozer android debug 2>&1 | tee /tmp/buildozer1.log || true
+          # Download and set up Android SDK command-line tools manually
+          echo "=== Setting up Android SDK ==="
+          mkdir -p ~/.buildozer/android/platform
+          cd ~/.buildozer/android/platform
+          curl -sL -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdline-tools.zip
+          mkdir -p android-sdk/cmdline-tools
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+          SDK_ROOT=~/.buildozer/android/platform/android-sdk
+          export ANDROIDSDK="$SDK_ROOT"
+          export ANDROIDAPI="34"
+          export ANDROIDMINAPI="21"
 
-          # Accept licenses if SDK was downloaded
-          SDK_DIR=~/.buildozer/android/platform/android-sdk
-          SDK_MGR=$(find "$SDK_DIR" -name sdkmanager -type f 2>/dev/null | head -1)
-          if [ -n "$SDK_MGR" ]; then
-            echo "=== Accepting licenses ==="
-            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1
-            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1
-          else
-            echo "=== SDK_MGR not found, checking SDK_DIR ==="
-            ls -la "$SDK_DIR" 2>/dev/null || echo "SDK_DIR does not exist"
-            find ~/.buildozer -name sdkmanager 2>/dev/null || echo "sdkmanager not found anywhere"
-          fi
+          # Accept licenses
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses 2>&1
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" 'platforms;android-34' 2>&1
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" 'build-tools;37.0.0' 2>&1
 
-          # Second run: actual build
-          echo "=== Second run: build APK ==="
-          yes | buildozer android debug 2>&1 | tee /tmp/buildozer2.log
+          # Run buildozer
+          echo "=== Running buildozer ==="
+          cd "$GITHUB_WORKSPACE"
+          yes | buildozer android debug 2>&1
+          echo "=== APK files ==="
+          find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
 
       - name: Upload APK
         uses: actions/upload-artifact@v7.0.1
