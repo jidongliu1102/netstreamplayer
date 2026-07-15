@@ -45,33 +45,14 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          # First run: let buildozer download SDK/NDK/ANT (will fail on license)
-          echo "=== First buildozer run: download SDK ==="
-          yes | buildozer android debug 2>&1 || true
+          # Pre-accept Android SDK licenses by creating the license file
+          mkdir -p ~/.android
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.android/repositories.cfg
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
 
-          # Accept licenses and install platform via sdkmanager
-          echo "=== Accepting SDK licenses ==="
-          SDK_DIR=~/.buildozer/android/platform/android-sdk
-          for i in 1 2 3; do
-            SDK_MGR=$(find "$SDK_DIR" -name sdkmanager -type f 2>/dev/null | head -1)
-            [ -n "$SDK_MGR" ] && break
-            sleep 5
-          done
-          if [ -n "$SDK_MGR" ]; then
-            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1 || true
-            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1 || true
-            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'build-tools;37.0.0' 2>&1 || true
-          else
-            echo "WARNING: sdkmanager not found, trying alternative path..."
-            SDK_MGR="$SDK_DIR/tools/bin/sdkmanager"
-            if [ -f "$SDK_MGR" ]; then
-              yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1 || true
-              yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1 || true
-            fi
-          fi
-
-          # Second run: actual build
-          echo "=== Second buildozer run ==="
+          echo "=== Running buildozer ==="
           yes | buildozer android debug 2>&1
           echo "=== APK files ==="
           find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
