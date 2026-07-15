@@ -45,14 +45,21 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          # Pre-accept Android SDK licenses by creating the license file
-          mkdir -p ~/.android
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.android/repositories.cfg
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+          # First run: let buildozer download SDK/NDK/ANT (will fail on license)
+          echo "=== First run: download SDK ==="
+          yes | buildozer android debug 2>&1 || true
 
-          echo "=== Running buildozer ==="
+          # Accept SDK licenses if SDK was downloaded
+          SDK_DIR=~/.buildozer/android/platform/android-sdk
+          SDK_MGR=$(find "$SDK_DIR" -name sdkmanager -type f 2>/dev/null | head -1)
+          if [ -n "$SDK_MGR" ]; then
+            echo "=== Accepting licenses ==="
+            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1 || true
+            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1 || true
+          fi
+
+          # Second run: actual build
+          echo "=== Second run: build APK ==="
           yes | buildozer android debug 2>&1
           echo "=== APK files ==="
           find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
