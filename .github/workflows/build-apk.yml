@@ -45,16 +45,34 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          # First run triggers SDK download
+          # First run: let buildozer download SDK/NDK/ANT (will fail on license)
+          echo "=== First buildozer run: download SDK ==="
           yes | buildozer android debug 2>&1 || true
-          # Accept SDK licenses and install platform if buildozer already downloaded the SDK
-          SDK=~/.buildozer/android/platform/android-sdk
-          if [ -d "$SDK" ]; then
-            yes | $SDK/tools/bin/sdkmanager --sdk_root=$SDK --licenses 2>/dev/null || true
-            yes | $SDK/tools/bin/sdkmanager --sdk_root=$SDK 'platforms;android-34' 2>/dev/null || true
+
+          # Accept licenses and install platform via sdkmanager
+          echo "=== Accepting SDK licenses ==="
+          SDK_DIR=~/.buildozer/android/platform/android-sdk
+          for i in 1 2 3; do
+            SDK_MGR=$(find "$SDK_DIR" -name sdkmanager -type f 2>/dev/null | head -1)
+            [ -n "$SDK_MGR" ] && break
+            sleep 5
+          done
+          if [ -n "$SDK_MGR" ]; then
+            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1 || true
+            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1 || true
+            yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'build-tools;37.0.0' 2>&1 || true
+          else
+            echo "WARNING: sdkmanager not found, trying alternative path..."
+            SDK_MGR="$SDK_DIR/tools/bin/sdkmanager"
+            if [ -f "$SDK_MGR" ]; then
+              yes | "$SDK_MGR" --sdk_root="$SDK_DIR" --licenses 2>&1 || true
+              yes | "$SDK_MGR" --sdk_root="$SDK_DIR" 'platforms;android-34' 2>&1 || true
+            fi
           fi
-          # Second run with licenses accepted
-          yes | buildozer android debug 2>&1 || true
+
+          # Second run: actual build
+          echo "=== Second buildozer run ==="
+          yes | buildozer android debug 2>&1
           echo "=== APK files ==="
           find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
 
