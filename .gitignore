@@ -1,0 +1,11 @@
+.buildozer/
+.buildozer_cache/
+bin/
+__pycache__/
+*.pyc
+*.pyo
+*.apk
+*.zip
+*.tar.gz
+sources.json
+captures/

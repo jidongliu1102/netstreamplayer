@@ -1,0 +1,286 @@
+#:kivy 2.0
+
+<SourceListScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.1, 0.1, 0.13, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [dp(10), dp(5)]
+            spacing: dp(5)
+
+            Label:
+                text: 'NetStreamPlayer'
+                font_size: dp(20)
+                bold: True
+                color: 0.9, 0.9, 0.9, 1
+                size_hint_x: 0.6
+                halign: 'left'
+                text_size: self.size
+
+            Button:
+                text: '添加源'
+                size_hint_x: 0.4
+                background_color: 0.2, 0.6, 0.3, 1
+                background_normal: ''
+                on_release: root.add_new_source()
+
+        ScrollView:
+            id: source_list_container
+            BoxLayout:
+                id: source_list
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(3)
+                padding: [dp(5), dp(5)]
+
+        BoxLayout:
+            size_hint_y: 0.05
+            padding: [dp(10), dp(2)]
+            Label:
+                text: 'Motion / MJPG-Streamer 播放器 v1.1'
+                font_size: dp(10)
+                color: 0.5, 0.5, 0.5, 1
+
+
+<EditSourceScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        canvas.before:
+            Color:
+                rgba: 0.12, 0.12, 0.15, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [dp(10), dp(5)]
+            spacing: dp(5)
+            Button:
+                text: '← 返回'
+                size_hint_x: 0.25
+                background_color: 0.3, 0.3, 0.3, 1
+                background_normal: ''
+                on_release: root.cancel()
+            Label:
+                text: '编辑源'
+                font_size: dp(18)
+                bold: True
+                color: 0.9, 0.9, 0.9, 1
+
+        ScrollView:
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(20), dp(15)]
+                spacing: dp(12)
+
+                Label:
+                    text: '源名称:'
+                    font_size: dp(14)
+                    color: 0.7, 0.7, 0.7, 1
+                    size_hint_y: None
+                    height: dp(20)
+                    halign: 'left'
+                    text_size: self.size
+
+                TextInput:
+                    id: source_name
+                    hint_text: '例如：前门摄像头'
+                    size_hint_y: None
+                    height: dp(40)
+                    background_color: 0.2, 0.2, 0.25, 1
+                    foreground_color: 1, 1, 1, 1
+                    hint_text_color: 0.4, 0.4, 0.4, 1
+                    multiline: False
+
+                Label:
+                    text: '流地址:'
+                    font_size: dp(14)
+                    color: 0.7, 0.7, 0.7, 1
+                    size_hint_y: None
+                    height: dp(20)
+                    halign: 'left'
+                    text_size: self.size
+
+                TextInput:
+                    id: source_url
+                    hint_text: 'http://192.168.1.100:8080/video.mjpg'
+                    size_hint_y: None
+                    height: dp(40)
+                    background_color: 0.2, 0.2, 0.25, 1
+                    foreground_color: 1, 1, 1, 1
+                    hint_text_color: 0.4, 0.4, 0.4, 1
+                    multiline: False
+
+                GridLayout:
+                    cols: 2
+                    spacing: dp(10)
+                    size_hint_y: None
+                    height: dp(80)
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(5)
+                        Label:
+                            text: '用户名:'
+                            font_size: dp(12)
+                            color: 0.6, 0.6, 0.6, 1
+                            size_hint_y: None
+                            height: dp(18)
+                            halign: 'left'
+                            text_size: self.size
+                        TextInput:
+                            id: source_username
+                            hint_text: '（可选）'
+                            size_hint_y: None
+                            height: dp(35)
+                            background_color: 0.2, 0.2, 0.25, 1
+                            foreground_color: 1, 1, 1, 1
+                            hint_text_color: 0.4, 0.4, 0.4, 1
+                            multiline: False
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(5)
+                        Label:
+                            text: '密码:'
+                            font_size: dp(12)
+                            color: 0.6, 0.6, 0.6, 1
+                            size_hint_y: None
+                            height: dp(18)
+                            halign: 'left'
+                            text_size: self.size
+                        TextInput:
+                            id: source_password
+                            hint_text: '（可选）'
+                            size_hint_y: None
+                            height: dp(35)
+                            background_color: 0.2, 0.2, 0.25, 1
+                            foreground_color: 1, 1, 1, 1
+                            hint_text_color: 0.4, 0.4, 0.4, 1
+                            multiline: False
+                            password: True
+
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: dp(60)
+                    padding: [dp(5), dp(5)]
+                    Label:
+                        text: '常用地址格式:'
+                        font_size: dp(11)
+                        color: 0.5, 0.5, 0.5, 1
+                        size_hint_y: None
+                        height: dp(15)
+                    Label:
+                        text: 'Motion: http://IP:PORT/\nMJPG-Streamer: http://IP:PORT/?action=stream'
+                        font_size: dp(10)
+                        color: 0.4, 0.4, 0.5, 1
+                        size_hint_y: None
+                        height: dp(40)
+                        markup: True
+
+        BoxLayout:
+            size_hint_y: 0.1
+            padding: [dp(20), dp(10)]
+            spacing: dp(15)
+
+            Button:
+                text: '取消'
+                background_color: 0.3, 0.3, 0.3, 1
+                background_normal: ''
+                on_release: root.cancel()
+
+            Button:
+                id: save_btn
+                text: '保存源'
+                background_color: 0.0, 0.5, 0.8, 1
+                background_normal: ''
+                on_release: root.save_source()
+
+
+<PlayerScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+
+        RelativeLayout:
+            id: video_container
+            size_hint_y: 0.85
+
+            RelativeLayout:
+                id: zoom_container
+
+        BoxLayout:
+            id: player_controls
+            size_hint_y: 0.15
+            padding: [dp(3), dp(3)]
+            spacing: dp(3)
+            canvas.before:
+                Color:
+                    rgba: 0.08, 0.08, 0.1, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            Button:
+                id: screenshot_btn
+                text: '截图'
+                font_size: dp(10)
+                background_color: 0.2, 0.2, 0.5, 1
+                background_normal: ''
+                on_release: root.take_screenshot()
+
+            Button:
+                id: record_btn
+                text: '录像'
+                font_size: dp(10)
+                background_color: 0.8, 0.2, 0.2, 0.7
+                background_normal: ''
+                on_release: root.toggle_recording()
+
+            Button:
+                id: fullscreen_btn
+                text: '全屏'
+                font_size: dp(10)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.toggle_fullscreen()
+
+            Button:
+                id: orientation_btn
+                text: '自动'
+                font_size: dp(10)
+                background_color: 0.2, 0.5, 0.5, 1
+                background_normal: ''
+                on_release: root.toggle_orientation()
+
+            Button:
+                text: '复位'
+                font_size: dp(10)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.reset_zoom()
+
+            Button:
+                text: '设置'
+                font_size: dp(10)
+                background_color: 0.3, 0.3, 0.4, 1
+                background_normal: ''
+                on_release: root.show_settings()
+
+            Button:
+                text: '返回'
+                font_size: dp(10)
+                background_color: 0.6, 0.2, 0.2, 1
+                background_normal: ''
+                on_release: root.go_back()
