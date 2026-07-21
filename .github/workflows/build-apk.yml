@@ -1,77 +1,192 @@
+# NetStreamPlayer CI - 网络视频播放器 Android APK 构建
+# 依赖: buildozer + p4a master (kivy/python-for-android.git@master)
+# 修复要点 (已在 build_apk_fix.sh 中整理):
+#   1) Cython 3.0.11  (Python 3.14 兼容)
+#   2) libx264: 顶层文件夹 + fseeko64 (NDK r28c) + os.chdir + chmod +x .sh
+#   3) requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
+#
+# 构建耗时约 60–90 分钟 (纯增量，约 40–60 分钟)
+
 name: Build APK
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # Allow manual trigger
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        arch: [ arm64-v8a_armeabi-v7a ]
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7.0.0
+    timeout-minutes: 120
 
-      - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install system dependencies
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ---- 系统依赖 ----
+      - name: Install system deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            git zip unzip \
-            autoconf libtool \
-            pkg-config zlib1g-dev libncurses-dev \
-            libtinfo5 cmake libffi-dev \
-            libssl-dev python3-pip || {
-              echo "Some packages failed, trying alternative names..."
-              sudo apt-get install -y -qq \
-                git zip unzip \
-                autoconf libtool \
-                pkg-config zlib1g-dev libncurses-dev \
-                cmake libffi-dev libssl-dev python3-pip
-            }
-          # Install JDK - try multiple names
-          sudo apt-get install -y -qq openjdk-17-jdk 2>/dev/null || \
-          sudo apt-get install -y -qq openjdk-21-jdk 2>/dev/null || \
-          echo "WARNING: JDK installation failed, buildozer may not work"
+            build-essential git zip unzip curl autoconf \
+            libtool pkg-config zlib1g-dev libncurses5-dev \
+            libffi-dev libssl-dev ccache python3-pip || {
+            echo "::error::系统依赖安装失败"; exit 1
+          }
 
-      - name: Install Buildozer
+      # ---- buildozer + p4a master ----
+      - name: Install buildozer + p4a
         run: |
-          pip install --upgrade pip
-          pip install buildozer cython
+          python -m pip install --upgrade pip wheel setuptools
+          pip install buildozer Cython
+          pip install git+https://github.com/kivy/python-for-android.git@master
+          python -m pip show python-for-android | head -5
+          buildozer --version
 
-      - name: Build APK with Buildozer
+      # ---- 预下载 SDK + NDK (避免构建中阻塞) ----
+      - name: Download SDK cmdline-tools + NDK r28c
+        env:
+          SDK_TOOLS_URL: https://dl.google.com/android/repository/commandlinetools-linux-11076707_latest.zip
+          NDK_URL: https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
         run: |
-          # Download and set up Android SDK command-line tools manually
-          echo "=== Setting up Android SDK ==="
-          mkdir -p ~/.buildozer/android/platform
-          cd ~/.buildozer/android/platform
-          curl -sL -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q cmdline-tools.zip
+          mkdir -p "$HOME/.buildozer/android/platform"
+          cd "$HOME/.buildozer/android/platform"
+          curl -fsSL "$SDK_TOOLS_URL" -o sdk-tools.zip
+          unzip -q sdk-tools.zip
           mkdir -p android-sdk/cmdline-tools
           mv cmdline-tools android-sdk/cmdline-tools/latest
-          SDK_ROOT=~/.buildozer/android/platform/android-sdk
-          export ANDROIDSDK="$SDK_ROOT"
-          export ANDROIDAPI="34"
-          export ANDROIDMINAPI="21"
 
-          # Accept licenses
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses 2>&1
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" 'platforms;android-34' 2>&1
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" 'build-tools;37.0.0' 2>&1
+          curl -fsSL "$NDK_URL" -o ndk.zip
+          mkdir -p android-ndk-r28c
+          unzip -q ndk.zip -d android-ndk-r28c
+          unzip -q -o ndk.zip  # 把顶层也解压(去嵌套)
+          mkdir -p android-ndk-r28c-tmp
+          unzip -q ndk.zip -d android-ndk-r28c-tmp
+          if [ -d android-ndk-r28c-tmp/android-ndk-r28c ]; then
+            rm -rf android-ndk-r28c
+            mv android-ndk-r28c-tmp/android-ndk-r28c android-ndk-r28c
+          fi
+          rm -rf android-ndk-r28c-tmp ndk.zip sdk-tools.zip
+          echo "SDK: $HOME/.buildozer/android/platform/android-sdk"
+          echo "NDK: $HOME/.buildozer/android/platform/android-ndk-r28c"
 
-          # Run buildozer
-          echo "=== Running buildozer ==="
-          cd "$GITHUB_WORKSPACE"
-          yes | buildozer android debug 2>&1
-          echo "=== APK files ==="
-          find . -name '*.apk' -ls 2>/dev/null || echo "No APK files found"
+      # ---- 缓存 SDK / NDK ----
+      - name: Cache SDK + NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer/android/platform/android-sdk
+            ~/.buildozer/android/platform/android-ndk-r28c
+          key: netstreamplayer-sdk-ndk-r28c
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v7.0.1
+      # ---- 安装 SDK 平台 + build-tools ----
+      - name: Install SDK platform + build-tools
+        run: |
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" \
+            'platforms;android-34' 'build-tools;34.0.0'
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses
+
+      # ---- 构建前校验 spec ----
+      - name: Verify buildozer.spec
+        run: |
+          grep -E 'ndk.version|^requirements|source.include_exts' buildozer.spec
+          test -f buildozer.spec && test -f main.py || { echo "缺失关键文件"; exit 1; }
+
+      # ---- 应用 p4a 修复 (构建前) ----
+      - name: Patch p4a (Cython 3.0.11 + libx264)
+        run: |
+          P4A=~/.buildozer/android/platform/python-for-android
+          python3 - "$P4A" <<'PY'
+          import sys, re
+          p4a = sys.argv[1]
+          import pathlib
+          c = pathlib.Path(f"{p4a}/pythonforandroid/recipes/cython/__init__.py")
+          if c.exists():
+              t = c.read_text()
+              t = t.replace("version = '0.29.36'", "version = '3.0.11'")
+              c.write_text(t); print("cython -> 3.0.11")
+
+          p = pathlib.Path(f"{p4a}/pythonforandroid/recipes/libx264/__init__.py")
+          if not p.exists():
+              print("libx264 recipe 不存在, 跳过")
+          else:
+              t = p.read_text()
+              m = re.search(r"\n    def build_arch\(self, arch\):\n        with current_directory\(self\.get_build_dir\(arch\.arch\)\):", t)
+              if not m:
+                  print("libx264 build_arch 模式未匹配, 跳过")
+              else:
+                  repl = """
+                  def build_arch(self, arch):
+                      import os, stat
+                      build_dir = self.get_build_dir(arch.arch)
+                      os.chdir(build_dir)
+                      # p4a unzip 会剥离执行权限, 这里恢复, 否则 ./configure 失败
+                      for root, dirs, files in os.walk(build_dir):
+                          for fn in files:
+                              if fn.endswith(".sh") or fn in ("configure","config.sub","config.guess","version.sh"):
+                                  fp = os.path.join(root, fn)
+                                  try:
+                                      st = os.stat(fp)
+                                      os.chmod(fp, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                                  except Exception:
+                                      pass
+                      with current_directory(self.get_build_dir(arch.arch)):"""
+                  t = t[:m.start()] + repl + t[m.end():]
+                  p.write_text(t); print("libx264: os.chdir + chmod +x .sh")
+          PY
+
+      # ---- 缓存已构建的 native 库 (加速后续构建) ----
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer/android/platform/build-*
+          key: netstreamplayer-native-libs
+
+      # ---- 编译 ----
+      - name: Build APK
+        env:
+          ANDROIDSDK: $HOME/.buildozer/android/platform/android-sdk
+          ANDROIDNDK: $HOME/.buildozer/android/platform/android-ndk-r28c
+          ANDROIDSDKAPI: '34'
+          ANDROIDMINAPI: '21'
+          NDK_VERSION: '28c'
+          P4A_BOOTSTRAP: sdl2
+        run: |
+          yes | buildozer android debug
+          echo "=== 生成的 APK ==="
+          find . -name '*.apk' -ls
+          ls -la bin/
+
+      # ---- 上传产物 ----
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: NetStreamPlayer-APK
-          path: bin/*.apk
+          path: |
+            bin/*.apk
+            .buildozer/android/app/*.apk
+
+      # ---- 失败时上传日志 ----
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            .buildozer/log/build.log
+            .buildozer/android/log/*.log
