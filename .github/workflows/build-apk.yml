@@ -5,7 +5,7 @@
 #   2) libx264: 顶层文件夹 + fseeko64 (NDK r28c) + os.chdir + chmod +x .sh
 #   3) requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
 #
-# 构建耗时约 60–90 分钟 (纯增量，约 40–60 分钟)
+# 构建耗时约 60-90 分钟 (纯增量，约 40-60 分钟)
 
 name: Build APK
 
@@ -18,9 +18,6 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        arch: [ arm64-v8a_armeabi-v7a ]
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -70,14 +67,12 @@ jobs:
           mv cmdline-tools android-sdk/cmdline-tools/latest
 
           curl -fsSL "$NDK_URL" -o ndk.zip
-          mkdir -p android-ndk-r28c
-          unzip -q ndk.zip -d android-ndk-r28c
-          unzip -q -o ndk.zip  # 把顶层也解压(去嵌套)
           mkdir -p android-ndk-r28c-tmp
           unzip -q ndk.zip -d android-ndk-r28c-tmp
           if [ -d android-ndk-r28c-tmp/android-ndk-r28c ]; then
-            rm -rf android-ndk-r28c
             mv android-ndk-r28c-tmp/android-ndk-r28c android-ndk-r28c
+          else
+            mv android-ndk-r28c-tmp android-ndk-r28c
           fi
           rm -rf android-ndk-r28c-tmp ndk.zip sdk-tools.zip
           echo "SDK: $HOME/.buildozer/android/platform/android-sdk"
@@ -106,48 +101,13 @@ jobs:
           grep -E 'ndk.version|^requirements|source.include_exts' buildozer.spec
           test -f buildozer.spec && test -f main.py || { echo "缺失关键文件"; exit 1; }
 
-      # ---- 应用 p4a 修复 (构建前) ----
+      # ---- 应用 p4a 修复 (Cython 3.0.11 + libx264 recipe) ----
       - name: Patch p4a (Cython 3.0.11 + libx264)
-        run: |
-          P4A=~/.buildozer/android/platform/python-for-android
-          python3 - "$P4A" <<'PY'
-          import sys, re
-          p4a = sys.argv[1]
-          import pathlib
-          c = pathlib.Path(f"{p4a}/pythonforandroid/recipes/cython/__init__.py")
-          if c.exists():
-              t = c.read_text()
-              t = t.replace('version = ''', 'version = 3.0.11', 1)  # bump cython
-              c.write_text(t); print("cython -> 3.0.11")
+        run: python ci/patch_p4a.py "$HOME/.buildozer/android/platform/python-for-android"
 
-          p = pathlib.Path(f"{p4a}/pythonforandroid/recipes/libx264/__init__.py")
-          if not p.exists():
-              print("libx264 recipe 不存在, 跳过")
-          else:
-              t = p.read_text()
-              m = re.search(r"\n    def build_arch\(self, arch\):\n        with current_directory\(self\.get_build_dir\(arch\.arch\)\):", t)
-              if not m:
-                  print("libx264 build_arch 模式未匹配, 跳过")
-              else:
-                  repl = """
-                  def build_arch(self, arch):
-                      import os, stat
-                      build_dir = self.get_build_dir(arch.arch)
-                      os.chdir(build_dir)
-                      # p4a unzip 会剥离执行权限, 这里恢复, 否则 ./configure 失败
-                      for root, dirs, files in os.walk(build_dir):
-                          for fn in files:
-                              if fn.endswith(".sh") or fn in ("configure","config.sub","config.guess","version.sh"):
-                                  fp = os.path.join(root, fn)
-                                  try:
-                                      st = os.stat(fp)
-                                      os.chmod(fp, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-                                  except Exception:
-                                      pass
-                      with current_directory(self.get_build_dir(arch.arch)):"""
-                  t = t[:m.start()] + repl + t[m.end():]
-                  p.write_text(t); print("libx264: os.chdir + chmod +x .sh")
-          PY
+      # ---- 修复 libx264 源码 zip (顶层文件夹 + fseeko64) ----
+      - name: Fix libx264 source zip (top-level folder + fseeko64)
+        run: python ci/fix_x264_zip.py
 
       # ---- 缓存已构建的 native 库 (加速后续构建) ----
       - name: Restore build cache
