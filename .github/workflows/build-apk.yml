@@ -114,7 +114,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.buildozer/android/platform/build-*
-          key: netstreamplayer-native-libs
+          key: netstreamplayer-native-libs-${{ hashFiles('ci/patch_p4a.py','ci/fix_x264_zip.py') }}
+          restore-keys: |
+            netstreamplayer-native-libs-
 
       # ---- 编译 ----
       - name: Build APK
