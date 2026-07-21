@@ -53,14 +53,43 @@ jobs:
           python -m pip show python-for-android | head -5
           buildozer --version
 
-      # ---- 预下载 SDK + NDK (避免构建中阻塞) ----
+      # ---- 缓存 SDK / NDK ----
+      - name: Cache SDK + NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer/android/platform/android-sdk
+            ~/.buildozer/android/platform/android-ndk-r28c
+          key: netstreamplayer-sdk-ndk-${{ hashFiles('.github/workflows/build-apk.yml') }}
+          restore-keys: |
+            netstreamplayer-sdk-ndk-
+
+      # ---- 预下载 SDK + NDK (避免构建中阻塞, 有缓存则跳过) ----
       - name: Download SDK cmdline-tools + NDK r28c
         env:
-          SDK_TOOLS_URL: https://dl.google.com/android/repository/commandlinetools-linux-11076707_latest.zip
+          SDK_TOOLS_URL: https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           NDK_URL: https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
         run: |
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          NDK="$HOME/.buildozer/android/platform/android-ndk-r28c"
+          if [ -d "$SDK/cmdline-tools/latest/bin" ] && [ -f "$NDK/source.properties" ]; then
+            echo "SDK/NDK 缓存已命中, 跳过下载"
+            echo "SDK: $SDK"
+            echo "NDK: $NDK"
+            exit 0
+          fi
+
           mkdir -p "$HOME/.buildozer/android/platform"
           cd "$HOME/.buildozer/android/platform"
+          # 删除残留缓存, 避免用上一次失败的半成品
+          rm -rf android-sdk android-ndk-r28c sdk-tools.zip ndk.zip android-ndk-r28c-tmp
+          for url in "$SDK_TOOLS_URL" "$NDK_URL"; do
+            echo "::debug::checking URL: $url"
+            code=$(curl -sI --max-time 15 "$url" | head -1 | awk '{print $2}')
+            if [ "$code" != "200" ]; then
+              echo "::error::下载失败: $url 返回 HTTP $code"; exit 22
+            fi
+          done
           curl -fsSL "$SDK_TOOLS_URL" -o sdk-tools.zip
           unzip -q sdk-tools.zip
           mkdir -p android-sdk/cmdline-tools
@@ -77,15 +106,6 @@ jobs:
           rm -rf android-ndk-r28c-tmp ndk.zip sdk-tools.zip
           echo "SDK: $HOME/.buildozer/android/platform/android-sdk"
           echo "NDK: $HOME/.buildozer/android/platform/android-ndk-r28c"
-
-      # ---- 缓存 SDK / NDK ----
-      - name: Cache SDK + NDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.buildozer/android/platform/android-sdk
-            ~/.buildozer/android/platform/android-ndk-r28c
-          key: netstreamplayer-sdk-ndk-r28c
 
       # ---- 安装 SDK 平台 + build-tools ----
       - name: Install SDK platform + build-tools
