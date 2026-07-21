@@ -31,6 +31,26 @@
                 background_normal: ''
                 on_release: root.add_new_source()
 
+        BoxLayout:
+            size_hint_y: None
+            height: dp(44)
+            padding: [dp(10), dp(4)]
+            spacing: dp(5)
+
+            Button:
+                text: '备份配置'
+                size_hint_x: 0.45
+                background_color: 0.2, 0.4, 0.8, 1
+                background_normal: ''
+                on_release: root.backup_config()
+
+            Button:
+                text: '恢复配置'
+                size_hint_x: 0.45
+                background_color: 0.6, 0.4, 0.2, 1
+                background_normal: ''
+                on_release: root.restore_config()
+
         ScrollView:
             id: source_list_container
             BoxLayout:

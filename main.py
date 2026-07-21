@@ -31,6 +31,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.image import Image
 from kivy.uix.popup import Popup
 from kivy.uix.relativelayout import RelativeLayout
+from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.scatter import Scatter
 from kivy.core.image import Image as CoreImage
 from kivy.core.window import Window
@@ -102,6 +103,12 @@ _STRINGS = {
     'please_enter_url': '请输入流地址',
     'footer': 'Motion / MJPG-Streamer 播放器 v1.1',
     'source_list_empty': '暂无视频源，点击上方按钮添加',
+    'backup_config': '备份配置',
+    'restore_config': '恢复配置',
+    'backup_ok': '备份成功',
+    'restore_ok': '恢复成功',
+    'backup_fail': '备份失败',
+    'restore_fail': '恢复失败，文件无效',
 }
 
 def _(key):
@@ -368,6 +375,41 @@ class SourceManager:
 
     def get_all(self):
         return self.sources
+
+    def backup(self, dst_dir=None):
+        """复制 sources.json 到 Download 目录，返回目标路径或 None。"""
+        if dst_dir is None:
+            if platform == 'android':
+                dst_dir = '/sdcard/Download'
+            else:
+                dst_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backup')
+        try:
+            os.makedirs(dst_dir, exist_ok=True)
+            date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            dst = os.path.join(dst_dir, f'netstreamplayer_backup_{date_str}.json')
+            with open(self.filepath, 'r', encoding='utf-8') as f:
+                data = f.read()
+            with open(dst, 'w', encoding='utf-8') as f:
+                f.write(data)
+            return dst
+        except Exception as e:
+            print(f'备份失败: {e}')
+            return None
+
+    def restore_from(self, src_path):
+        """从外部 JSON 文件导入配置，返回 True/False。"""
+        try:
+            with open(src_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            new_sources = data.get('sources', [])
+            if not isinstance(new_sources, list):
+                return False
+            self.sources = new_sources
+            self.save()
+            return True
+        except Exception as e:
+            print(f'恢复失败: {e}')
+            return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1034,6 +1076,53 @@ class SourceListScreen(Screen):
 
     def add_new_source(self):
         self.manager.current = 'edit_source'
+
+    def backup_config(self):
+        """备份 sources.json 到 Download 目录。"""
+        app = App.get_running_app()
+        dst = app.source_manager.backup()
+        if dst:
+            Popup(title=_('backup_ok'),
+                  content=Label(text=f'已保存:\n{dst}', font_size=dp(14)),
+                  size_hint=(0.7, 0.3)).open()
+        else:
+            Popup(title=_('backup_fail'),
+                  content=Label(text='无法写入文件，请检查权限', font_size=dp(14)),
+                  size_hint=(0.7, 0.3)).open()
+
+    def restore_config(self):
+        """弹出文件选择器，导入外部 sources.json。"""
+        fc = FileChooserListView(
+            filters=['*.json'],
+            path='/sdcard/Download' if platform == 'android' else os.getcwd(),
+            dirselect=False,
+            multiselect=False,
+        )
+        box = BoxLayout(orientation='vertical', spacing=dp(5))
+        box.add_widget(fc)
+
+        def _pick(*args):
+            sel = fc.selection
+            if not sel:
+                return
+            app = App.get_running_app()
+            ok = app.source_manager.restore_from(sel[0])
+            if ok:
+                self.refresh_list()
+                Popup(title=_('restore_ok'),
+                      content=Label(text=f'已导入:\n{sel[0]}', font_size=dp(14)),
+                      size_hint=(0.7, 0.3)).open()
+            else:
+                Popup(title=_('restore_fail'),
+                      content=Label(text='文件格式无效，需含 sources 列表', font_size=dp(14)),
+                      size_hint=(0.7, 0.3)).open()
+
+        btn_ok = Button(text=_('restore_config'), size_hint_y=None, height=dp(40))
+        btn_ok.bind(on_release=_pick)
+        box.add_widget(btn_ok)
+
+        Popup(title=_('restore_config'), content=box,
+              size_hint=(0.9, 0.8)).open()
 
 
 class SourceListItem(BoxLayout):
