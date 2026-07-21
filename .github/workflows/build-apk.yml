@@ -117,7 +117,7 @@ jobs:
           c = pathlib.Path(f"{p4a}/pythonforandroid/recipes/cython/__init__.py")
           if c.exists():
               t = c.read_text()
-              t = t.replace("version = '0.29.36'", "version = '3.0.11'")
+              t = re.sub(r"(?<=version = ')[^']*','3.0.11',t)  # bump any cython version -> 3.0.11
               c.write_text(t); print("cython -> 3.0.11")
 
           p = pathlib.Path(f"{p4a}/pythonforandroid/recipes/libx264/__init__.py")
