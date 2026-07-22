@@ -397,19 +397,68 @@ class SourceManager:
             return None
 
     def restore_from(self, src_path):
-        """从外部 JSON 文件导入配置，返回 True/False。"""
+        """从外部 JSON 文件导入配置，返回 (True, 'ok') 或 (False, '原因')。
+
+        兼容两种备份格式：
+          1) {"sources": [...], "version": "..."}  （程序原生备份）
+          2) [...]                                  （裸数组，部分导出方式）
+        并自动补齐每条源缺失的 name/url/id/created 默认值，避免导入后显示或操作异常。
+        """
         try:
             with open(src_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            new_sources = data.get('sources', [])
-            if not isinstance(new_sources, list):
-                return False
-            self.sources = new_sources
-            self.save()
-            return True
+        except FileNotFoundError:
+            return False, f'文件不存在: {src_path}'
+        except json.JSONDecodeError as e:
+            return False, f'JSON 解析失败: {e}'
         except Exception as e:
-            print(f'恢复失败: {e}')
-            return False
+            return False, f'读取失败: {e}'
+
+        # 兼容裸数组格式
+        if isinstance(data, dict):
+            new_sources = data.get('sources')
+        elif isinstance(data, list):
+            new_sources = data
+        else:
+            return False, '顶层不是 JSON 对象或数组'
+
+        if not isinstance(new_sources, list):
+            return False, 'sources 不是列表'
+        if not new_sources:
+            return False, 'sources 列表为空'
+
+        # 补齐每条源的必要字段，防止导入后编辑/播放出错
+        normalized = []
+        for s in new_sources:
+            if not isinstance(s, dict):
+                continue
+            src = {
+                'name': (s.get('name') or '').strip() or '未命名',
+                'url': (s.get('url') or '').strip(),
+                'username': s.get('username') or '',
+                'password': s.get('password') or '',
+            }
+            # 缺少 id 或 created 时补生成（保留原有的）
+            src['id'] = s.get('id') or str(int(time.time() * 1000) + len(normalized))
+            src['created'] = s.get('created') or datetime.now().isoformat()
+            normalized.append(src)
+
+        if not normalized:
+            return False, '没有可用的视频源条目'
+
+        self.sources = normalized
+        try:
+            self.save()
+        except Exception as e:
+            return False, f'保存失败: {e}'
+        return True, f'导入 {len(normalized)} 个视频源'
+
+    def _validate_source_entry(self, source):
+        """为单条源补齐缺失字段（add/update 前兜底）。"""
+        for key in ('name', 'url', 'username', 'password'):
+            if key not in source:
+                source[key] = ''
+        return source
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1106,15 +1155,15 @@ class SourceListScreen(Screen):
             if not sel:
                 return
             app = App.get_running_app()
-            ok = app.source_manager.restore_from(sel[0])
+            ok, msg = app.source_manager.restore_from(sel[0])
             if ok:
                 self.refresh_list()
                 Popup(title=_('restore_ok'),
-                      content=Label(text=f'已导入:\n{sel[0]}', font_size=dp(14)),
+                      content=Label(text=f'{msg}\n{sel[0]}', font_size=dp(14)),
                       size_hint=(0.7, 0.3)).open()
             else:
                 Popup(title=_('restore_fail'),
-                      content=Label(text='文件格式无效，需含 sources 列表', font_size=dp(14)),
+                      content=Label(text=msg, font_size=dp(14)),
                       size_hint=(0.7, 0.3)).open()
 
         btn_ok = Button(text=_('restore_config'), size_hint_y=None, height=dp(40))
