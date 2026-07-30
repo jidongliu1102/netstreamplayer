@@ -49,7 +49,7 @@ import requests
 
 _STRINGS = {
     'app_name': 'NetStreamPlayer',
-    'version': '1.1.4',
+    'version': '1.1.5',
     'add_source': '+ 添加源',
     'edit_source': '编辑源',
     'save_source': '保存源',

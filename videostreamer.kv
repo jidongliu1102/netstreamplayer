@@ -39,17 +39,24 @@
 
             Button:
                 text: '备份配置'
-                size_hint_x: 0.45
+                size_hint_x: 0.33
                 background_color: 0.2, 0.4, 0.8, 1
                 background_normal: ''
                 on_release: root.backup_config()
 
             Button:
                 text: '恢复配置'
-                size_hint_x: 0.45
+                size_hint_x: 0.33
                 background_color: 0.6, 0.4, 0.2, 1
                 background_normal: ''
                 on_release: root.restore_config()
+
+            Button:
+                text: '改端口'
+                size_hint_x: 0.33
+                background_color: 0.5, 0.3, 0.7, 1
+                background_normal: ''
+                on_release: root.batch_replace_port()
 
         ScrollView:
             id: source_list_container
