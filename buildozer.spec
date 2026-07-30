@@ -8,7 +8,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,ttc
 version = 1.1.4
 requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
-android.archs = arm64-v8a
+android.archs = arm64-v8a,armeabi-v7a
 orientation = portrait
 # Android manifest orientation (supports sensor-based rotation)
 android.manifest.orientation = fullSensor
