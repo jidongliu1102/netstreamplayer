@@ -8,6 +8,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,ttc
 version = 1.1.4
 requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
+android.archs = arm64-v8a
 orientation = portrait
 # Android manifest orientation (supports sensor-based rotation)
 android.manifest.orientation = fullSensor
@@ -18,7 +19,6 @@ android.permissions = INTERNET,ACCESS_NETWORK_STATE,WRITE_EXTERNAL_STORAGE,READ_
 android.api = 34
 android.minapi = 21
 android.log_level = info
-android.gradle_dependencies = androidx.core:core:1.12.0
 
 [buildozer]
 log_level = 2

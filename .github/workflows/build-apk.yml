@@ -159,19 +159,26 @@ jobs:
           P4A_BOOTSTRAP: sdl2
         run: |
           # 后台运行 buildozer，待 p4a clone 完成后打 recipe 补丁
-          yes | buildozer android debug --arch=arm64-v8a 2>&1 &
+          yes | buildozer android debug 2>&1 &
           BUILD_PID=$!
           P4A_DIR=".buildozer/android/platform/python-for-android"
           for i in $(seq 1 30 2>/dev/null || jot 30 2>/dev/null || python3 -c "for i in range(30): print(i+1)"); do
             if [ -d "$P4A_DIR" ]; then
               sleep 2
+              # patch libx264 recipe
               cp ci/libx264_recipe_patch.py \
                 "$P4A_DIR/pythonforandroid/recipes/libx264/__init__.py"
               echo "libx264 recipe: LFS strip patched"
+              # patch libffi recipe
               mkdir -p "$P4A_DIR/pythonforandroid/recipes/libffi"
               cp ci/libffi_recipe_patch.py \
                 "$P4A_DIR/pythonforandroid/recipes/libffi/__init__.py"
               echo "libffi recipe: patched"
+              # patch pip upgrade (pip 26.x breaks with BuildDependencyInstallError)
+              find "$P4A_DIR/pythonforandroid" -name '*.py' -exec grep -l 'pip install -U pip\|pip install --upgrade pip' {} \; 2>/dev/null | while read pyfile; do
+                sed -i 's/pip install -U pip/pip install pip==25.0.1/g; s/pip install --upgrade pip/pip install pip==25.0.1/g' "$pyfile"
+                echo "  pip pinned: ${pyfile#$P4A_DIR/}"
+              done
               break
             fi
             sleep 5

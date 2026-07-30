@@ -47,3 +47,14 @@ else:
         t = t[:m.start()] + repl + t[m.end():]
         p.write_text(t)
         print("libx264 recipe: os.chdir + chmod +x .sh")
+
+# --- Fix pip upgrade: pip 26.x removed BuildDependencyInstallError ---
+# p4a runs "pip install -U pip" which upgrades to pip 26.x and breaks.
+# Pin pip to 25.0.1 (compatible with Python 3.14 and p4a).
+for f in pathlib.Path(f"{p4a}/pythonforandroid").rglob("*.py"):
+    t = f.read_text()
+    if 'pip install -U pip' in t or 'pip install --upgrade pip' in t:
+        t = t.replace('pip install -U pip', 'pip install pip==25.0.1')
+        t = t.replace('pip install --upgrade pip', 'pip install pip==25.0.1')
+        f.write_text(t)
+        print(f"  pip pinned: {f.relative_to(p4a)}")
