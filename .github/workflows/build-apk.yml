@@ -1,0 +1,202 @@
+# NetStreamPlayer CI - 网络视频播放器 Android APK 构建
+# 依赖: buildozer + p4a master (kivy/python-for-android.git@master)
+# 修复要点 (已在 build_apk_fix.sh 中整理):
+#   1) Cython 3.0.11  (Python 3.14 兼容)
+#   2) libx264: 顶层文件夹 + fseeko64 (NDK r28c) + os.chdir + chmod +x .sh
+#   3) requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
+#   4) 单架构 arm64-v8a 编译 (避免 OOM)
+#
+# 构建耗时约 40-60 分钟 (纯增量，约 20-30 分钟)
+
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ---- 系统依赖 ----
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential git zip unzip curl autoconf automake \
+            libtool libtool-bin libltdl-dev pkg-config zlib1g-dev libncurses5-dev \
+            libffi-dev libssl-dev ccache python3-pip || {
+            echo "::error::系统依赖安装失败"; exit 1
+          }
+
+      # ---- buildozer + p4a master ----
+      - name: Install buildozer + p4a
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install buildozer Cython
+          pip install git+https://github.com/kivy/python-for-android.git@master
+          python -m pip show python-for-android | head -5
+          buildozer --version
+
+      # ---- 缓存 SDK / NDK ----
+      - name: Cache SDK + NDK
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.buildozer/android/platform/android-sdk
+            ~/.buildozer/android/platform/android-ndk-r28c
+          key: netstreamplayer-sdk-ndk-${{ hashFiles('.github/workflows/build-apk.yml') }}
+          restore-keys: |
+            netstreamplayer-sdk-ndk-
+
+      # ---- 预下载 SDK + NDK (避免构建中阻塞, 有缓存则跳过) ----
+      - name: Download SDK cmdline-tools + NDK r28c
+        env:
+          SDK_TOOLS_URL: https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
+          NDK_URL: https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
+        run: |
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          NDK="$HOME/.buildozer/android/platform/android-ndk-r28c"
+          if [ -d "$SDK/cmdline-tools/latest/bin" ] && [ -f "$NDK/source.properties" ]; then
+            echo "SDK/NDK 缓存已命中, 跳过下载"
+            echo "SDK: $SDK"
+            echo "NDK: $NDK"
+            exit 0
+          fi
+
+          mkdir -p "$HOME/.buildozer/android/platform"
+          cd "$HOME/.buildozer/android/platform"
+          # 删除残留缓存, 避免用上一次失败的半成品
+          rm -rf android-sdk android-ndk-r28c sdk-tools.zip ndk.zip android-ndk-r28c-tmp
+          for url in "$SDK_TOOLS_URL" "$NDK_URL"; do
+            echo "::debug::checking URL: $url"
+            code=$(curl -sI --max-time 15 "$url" | head -1 | awk '{print $2}')
+            if [ "$code" != "200" ]; then
+              echo "::error::下载失败: $url 返回 HTTP $code"; exit 22
+            fi
+          done
+          curl -fsSL "$SDK_TOOLS_URL" -o sdk-tools.zip
+          unzip -q sdk-tools.zip
+          mkdir -p android-sdk/cmdline-tools
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+
+          curl -fsSL "$NDK_URL" -o ndk.zip
+          mkdir -p android-ndk-r28c-tmp
+          unzip -q ndk.zip -d android-ndk-r28c-tmp
+          if [ -d android-ndk-r28c-tmp/android-ndk-r28c ]; then
+            mv android-ndk-r28c-tmp/android-ndk-r28c android-ndk-r28c
+          else
+            mv android-ndk-r28c-tmp android-ndk-r28c
+          fi
+          rm -rf android-ndk-r28c-tmp ndk.zip sdk-tools.zip
+          echo "SDK: $HOME/.buildozer/android/platform/android-sdk"
+          echo "NDK: $HOME/.buildozer/android/platform/android-ndk-r28c"
+
+      # ---- 安装 SDK 平台 + build-tools ----
+      - name: Install SDK platform + build-tools
+        run: |
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          # buildozer 期望 tools/bin/sdkmanager, 创建兼容性链接
+          mkdir -p "$SDK/tools/bin"
+          ln -sf ../../cmdline-tools/latest/bin/sdkmanager "$SDK/tools/bin/sdkmanager" 2>/dev/null || true
+          # 验证链接
+          ls -la "$SDK/tools/bin/sdkmanager" 2>/dev/null || echo "WARN: sdkmanager symlink missing"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" \
+            'platforms;android-34' 'build-tools;34.0.0'
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses
+
+      # ---- 构建前校验 spec ----
+      - name: Verify buildozer.spec
+        run: |
+          grep -E 'ndk.version|^requirements|source.include_exts' buildozer.spec
+          test -f buildozer.spec && test -f main.py || { echo "缺失关键文件"; exit 1; }
+
+      # ---- 应用 p4a 修复 (Cython 3.0.11 + libx264 recipe + LFS 宏剥离) ----
+      - name: Patch p4a recipes
+        run: |
+          P4A_DIR=$(python -c "import pythonforandroid, os; print(os.path.dirname(os.path.dirname(pythonforandroid.__file__)))")
+          python ci/patch_p4a.py "$P4A_DIR"
+          cp ci/libx264_recipe_patch.py \
+            "$P4A_DIR/pythonforandroid/recipes/libx264/__init__.py"
+          echo "libx264 recipe: LFS strip patched"
+          mkdir -p "$P4A_DIR/pythonforandroid/recipes/libffi"
+          cp ci/libffi_recipe_patch.py \
+            "$P4A_DIR/pythonforandroid/recipes/libffi/__init__.py"
+          echo "libffi recipe: patched"
+
+      # ---- 修复 libx264 源码 zip (顶层文件夹 + fseeko64) ----
+      - name: Fix libx264 source zip (top-level folder + fseeko64)
+        run: python ci/fix_x264_zip.py
+
+      # ---- 缓存已构建的 native 库 (加速后续构建) ----
+      - name: Restore build cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.buildozer/android/platform/build-*
+          key: netstreamplayer-native-libs-${{ hashFiles('ci/patch_p4a.py','ci/libx264_recipe_patch.py','ci/libffi_recipe_patch.py','ci/fix_x264_zip.py') }}
+          restore-keys: |
+            netstreamplayer-native-libs-
+
+      # ---- 编译 (单架构 arm64-v8a 避免 OOM) ----
+      - name: Build APK
+        env:
+          P4A_BOOTSTRAP: sdl2
+        run: |
+          # 后台运行 buildozer，待 p4a clone 完成后打 recipe 补丁
+          yes | buildozer android debug --arch=arm64-v8a 2>&1 &
+          BUILD_PID=$!
+          P4A_DIR=".buildozer/android/platform/python-for-android"
+          for i in $(seq 1 30 2>/dev/null || jot 30 2>/dev/null || python3 -c "for i in range(30): print(i+1)"); do
+            if [ -d "$P4A_DIR" ]; then
+              sleep 2
+              cp ci/libx264_recipe_patch.py \
+                "$P4A_DIR/pythonforandroid/recipes/libx264/__init__.py"
+              echo "libx264 recipe: LFS strip patched"
+              mkdir -p "$P4A_DIR/pythonforandroid/recipes/libffi"
+              cp ci/libffi_recipe_patch.py \
+                "$P4A_DIR/pythonforandroid/recipes/libffi/__init__.py"
+              echo "libffi recipe: patched"
+              break
+            fi
+            sleep 5
+          done
+          wait $BUILD_PID
+          echo "=== 生成的 APK ==="
+          find . -name '*.apk' -ls
+          ls -la bin/
+
+      # ---- 上传产物 ----
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: NetStreamPlayer-APK
+          path: |
+            bin/*.apk
+            .buildozer/android/app/*.apk
+
+      # ---- 失败时上传日志 ----
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-log
+          path: |
+            .buildozer/log/build.log
+            .buildozer/android/log/*.log
