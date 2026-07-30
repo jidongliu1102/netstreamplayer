@@ -108,6 +108,12 @@ _STRINGS = {
     'restore_ok': '恢复成功',
     'backup_fail': '备份失败',
     'restore_fail': '恢复失败，文件无效',
+    'batch_replace_port': '批量替换端口',
+    'old_port': '原端口:',
+    'new_port': '新端口:',
+    'replace': '替换',
+    'replace_result': '替换完成',
+    'replace_summary': '共处理 {count} 个源',
 }
 
 def _(key):
@@ -1327,6 +1333,80 @@ class SourceListScreen(Screen):
             Popup(title=_('restore_fail'),
                   content=Label(text=msg, font_size=dp(14)),
                   size_hint=(0.7, 0.3)).open()
+
+
+
+    def batch_replace_port(self):
+        """批量替换所有视频源 URL 中的端口号。"""
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(10))
+        content.add_widget(Label(
+            text='将批量替换所有视频源地址中的端口号',
+            font_size=dp(14), size_hint_y=None, height=dp(30)))
+        old_port_input = TextInput(
+            text='', hint_text='例如: 8080',
+            size_hint_y=None, height=dp(40), multiline=False,
+            background_color=(0.2, 0.2, 0.25, 1),
+            foreground_color=(1, 1, 1, 1))
+        new_port_input = TextInput(
+            text='', hint_text='例如: 9090',
+            size_hint_y=None, height=dp(40), multiline=False,
+            background_color=(0.2, 0.2, 0.25, 1),
+            foreground_color=(1, 1, 1, 1))
+        btn_layout = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
+        btn_cancel = Button(text=_('cancel'), background_color=(0.3, 0.3, 0.3, 1),
+                            background_normal='')
+        btn_replace = Button(text=_('replace'), background_color=(0.5, 0.3, 0.7, 1),
+                             background_normal='')
+        btn_layout.add_widget(btn_cancel)
+        btn_layout.add_widget(btn_replace)
+
+        popup_box = BoxLayout(orientation='vertical', spacing=dp(10))
+        popup_box.add_widget(Label(text='将批量替换所有视频源地址中的端口号',
+            font_size=dp(14), size_hint_y=None, height=dp(30)))
+        popup_box.add_widget(Label(text=_('old_port'), font_size=dp(12),
+            size_hint_y=None, height=dp(20), halign='left'))
+        popup_box.add_widget(old_port_input)
+        popup_box.add_widget(Label(text=_('new_port'), font_size=dp(12),
+            size_hint_y=None, height=dp(20), halign='left'))
+        popup_box.add_widget(new_port_input)
+        popup_box.add_widget(btn_layout)
+
+        popup = Popup(title=_('batch_replace_port'), content=popup_box,
+                      size_hint=(0.85, 0.55), auto_dismiss=False)
+
+        def _do_replace(btn):
+            old_port = old_port_input.text.strip()
+            new_port = new_port_input.text.strip()
+            if not old_port or not new_port or old_port == new_port:
+                return
+            app = App.get_running_app()
+            sources = app.source_manager.get_all()
+            count = 0
+            import re
+            for src in sources:
+                url = src.get('url', '')
+                new_url = re.sub(
+                    r':' + re.escape(old_port) + r'(?=[/\?#]|$)',
+                    ':' + new_port, url)
+                if new_url != url:
+                    src['url'] = new_url
+                    count += 1
+            if count > 0:
+                app.source_manager.save()
+                self.refresh_list()
+                popup.dismiss()
+                Popup(title=_('replace_result'),
+                      content=Label(text=_('replace_summary').format(count=count),
+                      font_size=dp(16)), size_hint=(0.6, 0.25)).open()
+            else:
+                popup.dismiss()
+                Popup(title=_('replace_result'),
+                      content=Label(text='没有找到匹配的端口号', font_size=dp(16)),
+                      size_hint=(0.6, 0.25)).open()
+
+        btn_replace.bind(on_release=_do_replace)
+        btn_cancel.bind(on_release=popup.dismiss)
+        popup.open()
 
 
 class SourceListItem(BoxLayout):
