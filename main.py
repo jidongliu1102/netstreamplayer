@@ -49,7 +49,7 @@ import requests
 
 _STRINGS = {
     'app_name': 'NetStreamPlayer',
-    'version': '1.1.5',
+    'version': '1.1.6',
     'add_source': '+ 添加源',
     'edit_source': '编辑源',
     'save_source': '保存源',
@@ -1173,9 +1173,34 @@ class SourceListScreen(Screen):
         self.manager.current = 'edit_source'
 
     def delete_source(self, source):
-        app = App.get_running_app()
-        app.source_manager.delete(source['id'])
-        self.refresh_list()
+        """点击✕删除视频源时弹出确认窗口。"""
+        source_name = source.get('name', _('unnamed'))
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(10))
+        content.add_widget(Label(
+            text=f'确认删除视频源 "{source_name}" ？',
+            font_size=dp(16), halign='center', valign='middle'
+        ))
+        btn_layout = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(15))
+        btn_cancel = Button(text=_('cancel'), background_color=(0.3, 0.3, 0.3, 1), background_normal='')
+        btn_confirm = Button(text='确认删除', background_color=(0.8, 0.2, 0.2, 1), background_normal='')
+        btn_layout.add_widget(btn_cancel)
+        btn_layout.add_widget(btn_confirm)
+        content.add_widget(btn_layout)
+
+        popup = Popup(
+            title='确认删除',
+            content=content,
+            size_hint=(0.8, 0.35),
+            auto_dismiss=False
+        )
+
+        btn_confirm.bind(on_release=lambda btn: (
+            App.get_running_app().source_manager.delete(source['id']),
+            self.refresh_list(),
+            popup.dismiss()
+        ))
+        btn_cancel.bind(on_release=popup.dismiss)
+        popup.open()
 
     def add_new_source(self):
         self.manager.current = 'edit_source'
