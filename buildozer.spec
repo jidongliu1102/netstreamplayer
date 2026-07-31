@@ -6,7 +6,7 @@ package.domain = com.nousresearch
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,ttc
-version = 1.1.5
+version = 1.1.6
 requirements = python3,kivy==2.3.1,requests,ffmpeg,av_codecs
 orientation = portrait
 # Android manifest orientation (supports sensor-based rotation)
